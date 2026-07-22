@@ -1,0 +1,9 @@
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
+  [redirects.rate_limit]
+    window = 60
+    max = 200
+    action = "block"
