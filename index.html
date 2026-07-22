@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BallAim · 小球瞄准</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23000'/%3E%3Ccircle cx='50' cy='50' r='35' fill='%23fff'/%3E%3Ccircle cx='50' cy='50' r='20' fill='%23ff0000'/%3E%3C/svg%3E" type="image/x-icon">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-drag: none;
+      touch-action: none;
+    }
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Inter', system-ui, monospace;
+      background: #bcb3b3;
+      position: fixed;
+      width: 100%;
+      height: 100%;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50px;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      border-bottom: 1px solid #e0e0e0;
+      pointer-events: auto;
+      z-index: 20;
+    }
+    #logo-area {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #logo-icon {
+      width: 22px;
+      height: 22px;
+    }
+    #logo {
+      font-weight: 700;
+      font-size: 14px;
+      color: #000;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    #back-btn {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      color: #555;
+      margin-left: 8px;
+      pointer-events: auto;
+      border-radius: 4px;
+    }
+    #stats-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+    .stat-item {
+      text-align: center;
+      min-width: 36px;
+    }
+    .stat-label {
+      font-size: 8px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stat-value {
+      font-size: 14px;
+      font-weight: 700;
+      color: #000;
+      line-height: 1.2;
+    }
+    #settings-btn {
+      position: absolute;
+      top: 60px;
+      right: 12px;
+      width: 40px;
+      height: 40px;
+      background: #ffffff;
+      border: 1px solid #ddd;
+      color: #000;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      font-weight: bold;
+      z-index: 25;
+      border-radius: 6px;
+    }
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 15;
+      color: #ff0000;
+      font-size: 28px;
+      line-height: 1;
+      text-shadow: 0 0 6px rgba(255,255,255,0.9);
+      font-weight: 100;
+    }
+    #shoot-btn {
+      position: absolute;
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      pointer-events: auto;
+      z-index: 30;
+      touch-action: none;
+      background: radial-gradient(circle at 30% 30%, #ff6b6b, #c0392b);
+      border: 4px solid #ffffff;
+      box-shadow: 0 8px 0 #7f1d1d, 0 12px 24px rgba(0,0,0,0.4);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 28px;
+      font-weight: 900;
+      text-shadow: 0 2px 0 #7f1d1d;
+    }
+    #shoot-btn::after {
+      content: "✜";
+      line-height: 1;
+    }
+    #shoot-btn:active {
+      transform: scale(0.88);
+      box-shadow: 0 3px 0 #7f1d1d, 0 8px 16px rgba(0,0,0,0.4);
+    }
+    #settings-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.6);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      touch-action: auto;
+    }
+    #settings-overlay.show {
+      display: flex;
+    }
+    #settings-panel {
+      background: #ffffff;
+      padding: 20px 18px;
+      width: 94%;
+      max-width: 800px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border-radius: 12px;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
+    #settings-panel .close-overlay {
+      position: absolute;
+      top: 8px;
+      right: 14px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #999;
+      padding: 0 6px;
+    }
+    #settings-panel h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #64748b;
+      text-align: center;
+    }
+    #settings-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+    .setting-group {
+      flex: 1 0 160px;
+      min-width: 140px;
+      border-bottom: none;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+      border-right: 1px solid #f0f0f0;
+      padding-right: 12px;
+    }
+    .setting-group:last-child {
+      border-right: none;
+      padding-right: 0;
+    }
+    .setting-group h4 {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #999;
+      margin-bottom: 6px;
+    }
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+    .setting-row label {
+      font-weight: 500;
+      color: #555;
+      font-size: 11px;
+      flex: 0 0 auto;
+    }
+    select, input[type="range"], input[type="color"], input[type="number"] {
+      padding: 3px 4px;
+      border: 1px solid #ddd;
+      background: #fff;
+      color: #000;
+      font-size: 11px;
+      outline: none;
+      border-radius: 4px;
+    }
+    input[type="color"] {
+      width: 32px;
+      height: 22px;
+      padding: 1px;
+    }
+    input[type="range"] {
+      width: 60px;
+      height: 4px;
+      -webkit-appearance: none;
+      background: #e0e0e0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      background: #000;
+      cursor: pointer;
+      border: 1px solid #fff;
+      box-shadow: 0 0 2px rgba(0,0,0,0.3);
+      border-radius: 50%;
+    }
+    input[type="number"] {
+      width: 50px;
+    }
+    button {
+      padding: 5px 10px;
+      border: 1px solid #ddd;
+      background: #fff;
+      color: #000;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      border-radius: 4px;
+      touch-action: manipulation;
+    }
+    button:hover {
+      background: #f5f5f5;
+    }
+    button.primary {
+      background: #000;
+      border-color: #000;
+      color: #fff;
+    }
+    button.primary:hover {
+      background: #333;
+    }
+    #settings-panel .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    #settings-panel .btn-row button {
+      flex: 0 1 auto;
+      min-width: 80px;
+    }
+    #btn-drag-area {
+      width: 100%;
+      height: 100px;
+      background: #f0f0f0;
+      border-radius: 8px;
+      position: relative;
+      margin: 4px 0;
+      touch-action: none;
+      overflow: hidden;
+      border: 1px dashed #ccc;
+    }
+    #btn-drag-area .drag-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #aaa;
+      font-size: 10px;
+      pointer-events: none;
+    }
+    #btn-drag-area #drag-preview {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #ff6b6b, #c0392b);
+      border: 3px solid #ffffff;
+      box-shadow: 0 3px 0 #7f1d1d, 0 6px 12px rgba(0,0,0,0.3);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 18px;
+      font-weight: 900;
+      text-shadow: 0 2px 0 #7f1d1d;
+    }
+    #btn-drag-area #drag-preview::after {
+      content: "⚡";
+      line-height: 1;
+    }
+    @media (max-width: 600px) {
+      .setting-group {
+        flex: 1 0 130px;
+        min-width: 120px;
+        padding-right: 8px;
+      }
+      #settings-panel {
+        padding: 16px 12px;
+        max-width: 98%;
+      }
+      .setting-row label {
+        font-size: 10px;
+      }
+      input[type="range"] {
+        width: 44px;
+      }
+      input[type="number"] {
+        width: 40px;
+      }
+      #btn-drag-area {
+        height: 80px;
+      }
+      #btn-drag-area #drag-preview {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+      }
+    }
+    @media (max-width: 480px) {
+      #top-bar { padding: 0 8px; height: 44px; }
+      #logo { font-size: 12px; }
+      .stat-item { min-width: 28px; }
+      .stat-value { font-size: 12px; }
+      .stat-label { font-size: 7px; }
+      #shoot-btn { width: 64px; height: 64px; font-size: 22px; }
+      #settings-btn { top: 54px; right: 8px; width: 34px; height: 34px; font-size: 16px; }
+      #settings-panel { padding: 14px 10px; }
+      .setting-group { flex: 1 0 100%; border-right: none; padding-right: 0; }
+    }
+    img { pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="ui-layer">
+    <div id="top-bar">
+      <div id="logo-area">
+        <img id="logo-icon" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23000'/%3E%3Ccircle cx='50' cy='50' r='35' fill='%23fff'/%3E%3Ccircle cx='50' cy='50' r='20' fill='%23ff0000'/%3E%3C/svg%3E" alt="icon">
+        <div id="logo">BALLAIM</div>
+        <button id="back-btn">返回</button>
+      </div>
+      <div id="stats-row">
+        <div class="stat-item"><div class="stat-label">FPS</div><div class="stat-value" id="fpsValue">0</div></div>
+        <div class="stat-item"><div class="stat-label">Timer</div><div class="stat-value" id="timerValue">00:00</div></div>
+        <div class="stat-item"><div class="stat-label">Score</div><div class="stat-value" id="scoreValue">0</div></div>
+        <div class="stat-item"><div class="stat-label">Acc</div><div class="stat-value" id="accuracyValue">0%</div></div>
+        <div class="stat-item"><div class="stat-label">Elims</div><div class="stat-value" id="elimsValue">0</div></div>
+      </div>
+    </div>
+    <div id="settings-btn">⚙</div>
+    <div id="crosshair">✛</div>
+    <div id="shoot-btn"></div>
+  </div>
+
+  <div id="settings-overlay">
+    <div id="settings-panel">
+      <button class="close-overlay" id="closeSettingsBtn">×</button>
+      <h3>设置</h3>
+      <div id="settings-grid">
+        <div class="setting-group">
+          <h4>场景</h4>
+          <div class="setting-row"><label>墙壁颜色</label><input type="color" id="wallColor" value="#ffffff"></div>
+          <div class="setting-row"><label>训练模式</label><select id="gameMode"><option value="normal" selected>普通</option><option value="survival">生存</option></select></div>
+          <div class="setting-row"><label>时长</label><select id="duration"><option value="0" selected>无限</option><option value="30">30秒</option><option value="60">60秒</option><option value="120">120秒</option><option value="300">300秒</option></select></div>
+        </div>
+        <div class="setting-group">
+          <h4>视角</h4>
+          <div class="setting-row"><label>FOV</label><input type="range" id="fovSlider" min="50" max="120" value="70"><input type="number" id="fovInput" min="50" max="120" value="70"></div>
+        </div>
+        <div class="setting-group">
+          <h4>准星</h4>
+          <div class="setting-row"><label>样式</label><select id="crosshairType"><option value="cross" selected>十字</option><option value="dot">圆点</option><option value="circle">圆圈</option></select></div>
+          <div class="setting-row"><label>颜色</label><input type="color" id="crosshairColor" value="#ff0000"></div>
+          <div class="setting-row"><label>大小</label><input type="range" id="crosshairSize" min="12" max="48" value="24"></div>
+        </div>
+        <div class="setting-group">
+          <h4>灵敏度</h4>
+          <div class="setting-row"><label>鼠标速度</label><input type="range" id="sensitivitySlider" min="0.1" max="3.0" step="0.05" value="0.50"><input type="number" id="sensitivityInput" min="0.1" max="10.0" step="0.01" value="0.50"></div>
+        </div>
+        <div class="setting-group">
+          <h4>气球</h4>
+          <div class="setting-row" id="ballCountRow"><label>同时数量</label><select id="ballCount"><option value="3" selected>3</option><option value="5">5</option><option value="8">8</option><option value="12">12</option></select></div>
+          <div class="setting-row"><label>大小</label><input type="range" id="ballSize" min="0.1" max="1.2" step="0.05" value="0.6"></div>
+          <div class="setting-row"><label>颜色</label><input type="color" id="ballColorPicker" value="#000000"></div>
+          <div class="setting-row"><label>生成宽</label><input type="range" id="spawnWidth" min="1" max="10" step="0.5" value="6"></div>
+          <div class="setting-row"><label>生成高</label><input type="range" id="spawnHeight" min="1" max="5.5" step="0.5" value="3.5"></div>
+        </div>
+        <div class="setting-group">
+          <h4>射击按钮位置</h4>
+          <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:2px;">
+            <label style="font-size:10px; color:#888;">拖动下方按钮调整位置</label>
+            <div id="btn-drag-area">
+              <span class="drag-label">拖动我</span>
+              <div id="drag-preview"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button id="trainingBtn" class="primary">开始训练</button>
+        <button id="resetStatsBtn">重置统计</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.128.0/build/three.module.js" } }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    function createHitSound() {
+      let audioCtx = null;
+      return {
+        play: function() {
+          try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.08);
+            gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.1);
+          } catch(e) {}
+        }
+      };
+    }
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xbcb3b3);
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 2.8, 5);
+    camera.lookAt(0, 2.5, -2);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+    const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+    dir.position.set(2, 5, 4);
+    scene.add(dir);
+    const back = new THREE.DirectionalLight(0xffffff, 0.4);
+    back.position.set(-2, 3, -1);
+    scene.add(back);
+
+    const WALL_WIDTH = 12, WALL_HEIGHT = 7;
+    const wallGeo = new THREE.PlaneGeometry(WALL_WIDTH, WALL_HEIGHT);
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, roughness: 0.9 });
+    const wall = new THREE.Mesh(wallGeo, wallMat);
+    wall.position.set(0, WALL_HEIGHT/2, -3);
+    scene.add(wall);
+    const edges = new THREE.EdgesGeometry(wallGeo);
+    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xcccccc }));
+    wall.add(line);
+
+    const otherMat = new THREE.MeshStandardMaterial({ color: 0xbcb3b3, side: THREE.DoubleSide, roughness: 0.9 });
+    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(6, WALL_HEIGHT), otherMat);
+    leftWall.position.set(-WALL_WIDTH/2 - 3, WALL_HEIGHT/2, -3);
+    leftWall.rotation.y = Math.PI / 2;
+    scene.add(leftWall);
+    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(6, WALL_HEIGHT), otherMat);
+    rightWall.position.set(WALL_WIDTH/2 + 3, WALL_HEIGHT/2, -3);
+    rightWall.rotation.y = -Math.PI / 2;
+    scene.add(rightWall);
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(WALL_WIDTH + 12, 6), otherMat);
+    ceiling.position.set(0, WALL_HEIGHT + 3, -3);
+    ceiling.rotation.x = -Math.PI / 2;
+    scene.add(ceiling);
+    const floorWall = new THREE.Mesh(new THREE.PlaneGeometry(WALL_WIDTH + 12, 6), otherMat);
+    floorWall.position.set(0, -3, -3);
+    floorWall.rotation.x = Math.PI / 2;
+    scene.add(floorWall);
+
+    const hitSound = createHitSound();
+
+    const defaultSettings = {
+      wallColor: '#ffffff', gameMode: 'normal', duration: '0', fov: 70,
+      crosshairType: 'cross', crosshairColor: '#ff0000', crosshairSize: 24,
+      sensitivity: 0.50, ballCount: 3, ballSize: 0.6, ballColor: '#000000',
+      spawnWidth: 6, spawnHeight: 3.5, btnOffsetX: 0, btnOffsetY: 0
+    };
+
+    function loadSettings() {
+      try { const s = localStorage.getItem('ballaim_settings'); return s ? { ...defaultSettings, ...JSON.parse(s) } : { ...defaultSettings }; } 
+      catch { return { ...defaultSettings }; }
+    }
+    function saveSettings() {
+      const s = {
+        wallColor: document.getElementById('wallColor').value,
+        gameMode: document.getElementById('gameMode').value,
+        duration: document.getElementById('duration').value,
+        fov: parseInt(document.getElementById('fovInput').value),
+        crosshairType: document.getElementById('crosshairType').value,
+        crosshairColor: document.getElementById('crosshairColor').value,
+        crosshairSize: parseInt(document.getElementById('crosshairSize').value),
+        sensitivity: parseFloat(document.getElementById('sensitivityInput').value),
+        ballCount: parseInt(document.getElementById('ballCount').value),
+        ballSize: parseFloat(document.getElementById('ballSize').value),
+        ballColor: document.getElementById('ballColorPicker').value,
+        spawnWidth: parseFloat(document.getElementById('spawnWidth').value),
+        spawnHeight: parseFloat(document.getElementById('spawnHeight').value),
+        btnOffsetX: btnOffsetX,
+        btnOffsetY: btnOffsetY
+      };
+      localStorage.setItem('ballaim_settings', JSON.stringify(s));
+    }
+
+    let btnOffsetX = 0, btnOffsetY = 0;
+
+    const settings = loadSettings();
+    btnOffsetX = settings.btnOffsetX || 0;
+    btnOffsetY = settings.btnOffsetY || 0;
+    document.getElementById('wallColor').value = settings.wallColor;
+    document.getElementById('gameMode').value = settings.gameMode;
+    document.getElementById('duration').value = settings.duration;
+    document.getElementById('fovSlider').value = settings.fov;
+    document.getElementById('fovInput').value = settings.fov;
+    document.getElementById('crosshairType').value = settings.crosshairType;
+    document.getElementById('crosshairColor').value = settings.crosshairColor;
+    document.getElementById('crosshairSize').value = settings.crosshairSize;
+    document.getElementById('sensitivitySlider').value = settings.sensitivity;
+    document.getElementById('sensitivityInput').value = settings.sensitivity;
+    document.getElementById('ballCount').value = settings.ballCount;
+    document.getElementById('ballSize').value = settings.ballSize;
+    document.getElementById('ballColorPicker').value = settings.ballColor;
+    document.getElementById('spawnWidth').value = settings.spawnWidth;
+    document.getElementById('spawnHeight').value = settings.spawnHeight;
+    wall.material.color.set(settings.wallColor);
+    camera.fov = settings.fov;
+    camera.updateProjectionMatrix();
+    if (settings.gameMode === 'survival') document.getElementById('ballCountRow').style.display = 'none';
+
+    const devSettings = (() => { try { const raw = localStorage.getItem('ballaim_dev'); return raw ? JSON.parse(raw) : { aimLock: false, autoShoot: false, debug: false }; } catch { return { aimLock: false, autoShoot: false, debug: false }; } })();
+
+    const state = {
+      score: 0, shots: 0, elims: 0, accuracy: 0, elapsedTime: 0, countdown: 0,
+      gameMode: settings.gameMode, ballCount: settings.gameMode === 'survival' ? 1 : settings.ballCount,
+      ballSize: settings.ballSize, ballColor: settings.ballColor,
+      spawnWidth: settings.spawnWidth, spawnHeight: settings.spawnHeight,
+      sensitivity: settings.sensitivity, yaw: 0, pitch: 0,
+      active: false, training: false, timerInterval: null, clockInterval: null,
+      balls: [], aimLock: devSettings.aimLock || false, autoShoot: devSettings.autoShoot || false,
+      debug: devSettings.debug || false, lastAutoShootTime: 0
+    };
+
+    let ballTex = null;
+    new THREE.TextureLoader().load('data/ball.png', tex => { ballTex = tex; });
+
+    function createBall(x, y, z) {
+      const s = state.ballSize;
+      const geo = new THREE.SphereGeometry(s / 2, 32, 16);
+      let mat;
+      if (ballTex && state.ballColor === '#000000') {
+        mat = new THREE.MeshStandardMaterial({ map: ballTex, transparent: true, side: THREE.DoubleSide, roughness: 0.1, metalness: 0.3 });
+      } else {
+        mat = new THREE.MeshStandardMaterial({ color: state.ballColor, side: THREE.DoubleSide, roughness: 0.1, metalness: 0.3 });
+      }
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x, y, z);
+      mesh.renderOrder = 1;
+      scene.add(mesh);
+      if (state.debug) {
+        const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xff00ff }));
+        mesh.add(wire);
+      }
+      return mesh;
+    }
+
+    function isOverlapping(x, y, existing) {
+      const minDist = state.ballSize * 1.5;
+      for (const b of existing) {
+        const dx = b.position.x - x, dy = b.position.y - y;
+        if (Math.sqrt(dx*dx + dy*dy) < minDist) return true;
+      }
+      return false;
+    }
+
+    function getSpawnRange() {
+      const half = state.ballSize / 2;
+      const maxX = (WALL_WIDTH / 2) - half;
+      const minY = half, maxY = WALL_HEIGHT - half;
+      const aw = Math.min(state.spawnWidth, maxX * 2);
+      const ah = Math.min(state.spawnHeight, maxY - minY);
+      return { minX: -aw/2, maxX: aw/2, minY: minY, maxY: minY + ah };
+    }
+
+    function getSpawnPos() {
+      const r = getSpawnRange();
+      for (let i = 0; i < 100; i++) {
+        const x = r.minX + Math.random() * (r.maxX - r.minX);
+        const y = r.minY + Math.random() * (r.maxY - r.minY);
+        if (!isOverlapping(x, y, state.balls)) return { x, y };
+      }
+      return { x: r.minX + Math.random() * (r.maxX - r.minX), y: r.minY + Math.random() * (r.maxY - r.minY) };
+    }
+
+    function spawnBall() {
+      if (state.gameMode === 'survival') {
+        if (state.balls.length >= 1) return;
+        const pos = getSpawnPos();
+        const ball = createBall(pos.x, pos.y, -2.95);
+        state.balls.push(ball);
+        startSurvivalTimer(ball);
+      } else {
+        if (state.balls.length >= state.ballCount) return;
+        const pos = getSpawnPos();
+        state.balls.push(createBall(pos.x, pos.y, -2.95));
+      }
+    }
+
+    function startSurvivalTimer(ball) {
+      const lifetime = 2.0;
+      const start = performance.now();
+      function update() {
+        if (state.gameMode !== 'survival') return;
+        const idx = state.balls.indexOf(ball);
+        if (idx === -1) return;
+        const elapsed = (performance.now() - start) / 1000;
+        const progress = Math.min(elapsed / lifetime, 1.0);
+        const scale = Math.max(1.0 - progress, 0.01);
+        ball.scale.set(scale, scale, scale);
+        if (progress >= 1.0) {
+          scene.remove(ball);
+          state.balls.splice(idx, 1);
+          spawnBall();
+        } else {
+          requestAnimationFrame(update);
+        }
+      }
+      requestAnimationFrame(update);
+    }
+
+    function resetBalls() {
+      state.balls.forEach(b => scene.remove(b));
+      state.balls = [];
+      if (state.gameMode === 'survival') spawnBall();
+      else for (let i = 0; i < state.ballCount; i++) spawnBall();
+    }
+
+    function updateStats() {
+      document.getElementById('scoreValue').textContent = state.score;
+      document.getElementById('elimsValue').textContent = state.elims;
+      document.getElementById('accuracyValue').textContent = state.accuracy + '%';
+    }
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60), s = sec % 60;
+      return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }
+
+    function performShoot() {
+      if (!state.active) {
+        state.active = true;
+      }
+      state.shots++;
+      const rc = new THREE.Raycaster();
+      rc.setFromCamera(new THREE.Vector2(0, 0), camera);
+      const hits = rc.intersectObjects(state.balls);
+      if (hits.length > 0) {
+        const obj = hits[0].object;
+        const idx = state.balls.indexOf(obj);
+        if (idx !== -1) {
+          state.score += 1;
+          state.elims++;
+          hitSound.play();
+          scene.remove(obj);
+          state.balls.splice(idx, 1);
+          spawnBall();
+        }
+      }
+      state.accuracy = state.shots > 0 ? Math.round((state.elims / state.shots) * 100) : 0;
+      updateStats();
+    }
+
+    function shoot() { performShoot(); }
+
+    document.addEventListener('mousemove', e => {
+      if (!state.active) return;
+      state.yaw -= e.movementX * state.sensitivity * 0.002;
+      state.pitch -= e.movementY * state.sensitivity * 0.002;
+      state.pitch = Math.max(-1.2, Math.min(1.2, state.pitch));
+      camera.quaternion.setFromEuler(new THREE.Euler(state.pitch, state.yaw, 0, 'YXZ'));
+    });
+
+    let touchMap = new Map();
+
+    renderer.domElement.addEventListener('touchstart', e => {
+      e.preventDefault();
+      if (!state.active) {
+        state.active = true;
+      }
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        touchMap.set(t.identifier, { clientX: t.clientX, clientY: t.clientY });
+      }
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchmove', e => {
+      e.preventDefault();
+      if (!state.active) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (touchMap.has(t.identifier)) {
+          const prev = touchMap.get(t.identifier);
+          const dx = t.clientX - prev.clientX;
+          const dy = t.clientY - prev.clientY;
+          state.yaw -= dx * state.sensitivity * 0.005;
+          state.pitch -= dy * state.sensitivity * 0.005;
+          state.pitch = Math.max(-1.2, Math.min(1.2, state.pitch));
+          camera.quaternion.setFromEuler(new THREE.Euler(state.pitch, state.yaw, 0, 'YXZ'));
+          touchMap.set(t.identifier, { clientX: t.clientX, clientY: t.clientY });
+        }
+      }
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchend', e => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        touchMap.delete(t.identifier);
+      }
+    }, { passive: true });
+
+    renderer.domElement.addEventListener('touchcancel', e => {
+      touchMap.clear();
+    }, { passive: true });
+
+    const shootBtn = document.getElementById('shoot-btn');
+    shootBtn.addEventListener('touchstart', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      shoot();
+    }, { passive: false });
+    shootBtn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      shoot();
+    });
+
+    function updateShootBtnPosition() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const btnSize = Math.min(w, h) > 480 ? 76 : 64;
+      const marginX = 30;
+      const marginY = 40;
+      const maxX = w - btnSize - marginX;
+      const maxY = h - btnSize - marginY;
+      const xPercent = (btnOffsetX + 120) / 240;
+      const yPercent = (btnOffsetY + 120) / 240;
+      let px = marginX + xPercent * (maxX - marginX);
+      let py = marginY + yPercent * (maxY - marginY);
+      px = Math.max(marginX, Math.min(maxX, px));
+      py = Math.max(marginY, Math.min(maxY, py));
+      shootBtn.style.left = px + 'px';
+      shootBtn.style.right = 'auto';
+      shootBtn.style.bottom = 'auto';
+      shootBtn.style.top = py + 'px';
+      const preview = document.getElementById('drag-preview');
+      const area = document.getElementById('btn-drag-area');
+      const rect = area.getBoundingClientRect();
+      const ppx = (btnOffsetX / 120) * (rect.width - 56) / 2 + 28;
+      const ppy = (btnOffsetY / 120) * (rect.height - 56) / 2 + 28;
+      preview.style.left = ppx + 'px';
+      preview.style.top = ppy + 'px';
+    }
+
+    const dragArea = document.getElementById('btn-drag-area');
+    let isDragging = false;
+
+    function handleDrag(clientX, clientY) {
+      const rect = dragArea.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const w = rect.width, h = rect.height;
+      const half = 28;
+      let px = Math.max(half, Math.min(w - half, x));
+      let py = Math.max(half, Math.min(h - half, y));
+      btnOffsetX = Math.round(((px - half) / (w - 56)) * 240 - 120);
+      btnOffsetY = Math.round(((py - half) / (h - 56)) * 240 - 120);
+      btnOffsetX = Math.max(-120, Math.min(120, btnOffsetX));
+      btnOffsetY = Math.max(-120, Math.min(120, btnOffsetY));
+      updateShootBtnPosition();
+      saveSettings();
+    }
+
+    dragArea.addEventListener('mousedown', e => {
+      isDragging = true;
+      handleDrag(e.clientX, e.clientY);
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (isDragging) {
+        handleDrag(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+    document.addEventListener('mouseup', () => { isDragging = false; });
+
+    dragArea.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      isDragging = true;
+      handleDrag(t.clientX, t.clientY);
+      e.preventDefault();
+    }, { passive: false });
+    document.addEventListener('touchmove', e => {
+      if (isDragging && e.touches.length > 0) {
+        const t = e.touches[0];
+        handleDrag(t.clientX, t.clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+    document.addEventListener('touchend', () => { isDragging = false; });
+
+    function startClock() {
+      if (state.clockInterval) clearInterval(state.clockInterval);
+      state.clockInterval = setInterval(() => {
+        state.elapsedTime++;
+        document.getElementById('timerValue').textContent = formatTime(state.elapsedTime);
+      }, 1000);
+    }
+
+    function startTraining() {
+      const dur = parseInt(document.getElementById('duration').value);
+      state.training = true;
+      state.score = 0; state.shots = 0; state.elims = 0; state.accuracy = 0; state.elapsedTime = 0;
+      updateStats();
+      resetBalls();
+      if (state.clockInterval) clearInterval(state.clockInterval);
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      if (dur > 0) {
+        state.countdown = dur;
+        document.getElementById('timerValue').textContent = formatTime(state.countdown);
+        state.timerInterval = setInterval(() => {
+          state.countdown--;
+          document.getElementById('timerValue').textContent = formatTime(state.countdown);
+          if (state.countdown <= 0) {
+            clearInterval(state.timerInterval);
+            state.training = false;
+            updateTrainingBtn();
+            startClock();
+          }
+        }, 1000);
+      } else {
+        document.getElementById('timerValue').textContent = '00:00';
+        startClock();
+      }
+      updateTrainingBtn();
+    }
+
+    function stopTraining() {
+      state.training = false;
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      if (state.clockInterval) clearInterval(state.clockInterval);
+      startClock();
+      updateTrainingBtn();
+    }
+
+    function updateTrainingBtn() {
+      const btn = document.getElementById('trainingBtn');
+      btn.textContent = state.training ? '关闭训练' : '开始训练';
+    }
+
+    function applyBallSettings() {
+      state.ballSize = parseFloat(document.getElementById('ballSize').value);
+      state.ballColor = document.getElementById('ballColorPicker').value;
+      state.spawnWidth = parseFloat(document.getElementById('spawnWidth').value);
+      state.spawnHeight = parseFloat(document.getElementById('spawnHeight').value);
+      saveSettings();
+      resetBalls();
+    }
+
+    function updateCrosshair() {
+      const type = document.getElementById('crosshairType').value;
+      const el = document.getElementById('crosshair');
+      if (type === 'cross') el.textContent = '✛';
+      else if (type === 'dot') el.textContent = '●';
+      else el.textContent = '○';
+      el.style.color = document.getElementById('crosshairColor').value;
+      el.style.fontSize = document.getElementById('crosshairSize').value + 'px';
+    }
+
+    document.getElementById('back-btn').onclick = () => { window.location.href = 'index.html'; };
+    const overlay = document.getElementById('settings-overlay');
+    document.getElementById('settings-btn').onclick = () => { overlay.classList.toggle('show'); };
+    document.getElementById('closeSettingsBtn').onclick = () => { overlay.classList.remove('show'); };
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('show'); });
+
+    document.getElementById('gameMode').onchange = (e) => {
+      state.gameMode = e.target.value;
+      if (state.gameMode === 'survival') {
+        document.getElementById('ballCountRow').style.display = 'none';
+        state.ballCount = 1;
+      } else {
+        document.getElementById('ballCountRow').style.display = 'flex';
+        state.ballCount = parseInt(document.getElementById('ballCount').value);
+      }
+      saveSettings();
+      resetBalls();
+    };
+    document.getElementById('fovSlider').oninput = e => {
+      const v = parseInt(e.target.value);
+      document.getElementById('fovInput').value = v;
+      camera.fov = v; camera.updateProjectionMatrix(); saveSettings();
+    };
+    document.getElementById('fovInput').onchange = e => {
+      const v = parseInt(e.target.value) || 70;
+      document.getElementById('fovSlider').value = v;
+      camera.fov = v; camera.updateProjectionMatrix(); saveSettings();
+    };
+    document.getElementById('crosshairType').onchange = () => { updateCrosshair(); saveSettings(); };
+    document.getElementById('crosshairColor').oninput = () => { updateCrosshair(); saveSettings(); };
+    document.getElementById('crosshairSize').oninput = () => { updateCrosshair(); saveSettings(); };
+    document.getElementById('sensitivitySlider').oninput = e => {
+      const v = parseFloat(e.target.value);
+      document.getElementById('sensitivityInput').value = v;
+      state.sensitivity = v; saveSettings();
+    };
+    document.getElementById('sensitivityInput').onchange = e => {
+      const v = parseFloat(e.target.value) || 1.0;
+      document.getElementById('sensitivitySlider').value = v;
+      state.sensitivity = v; saveSettings();
+    };
+    document.getElementById('ballCount').onchange = (e) => {
+      if (state.gameMode !== 'survival') { state.ballCount = parseInt(e.target.value); saveSettings(); resetBalls(); }
+    };
+    document.getElementById('ballSize').oninput = () => { applyBallSettings(); };
+    document.getElementById('ballColorPicker').oninput = () => { applyBallSettings(); };
+    document.getElementById('spawnWidth').oninput = () => { applyBallSettings(); };
+    document.getElementById('spawnHeight').oninput = () => { applyBallSettings(); };
+    document.getElementById('wallColor').oninput = e => { wall.material.color.set(e.target.value); saveSettings(); };
+    document.getElementById('trainingBtn').onclick = () => {
+      if (state.training) stopTraining();
+      else startTraining();
+      overlay.classList.remove('show');
+    };
+    document.getElementById('resetStatsBtn').onclick = () => {
+      state.score = 0; state.shots = 0; state.elims = 0; state.accuracy = 0; state.elapsedTime = 0;
+      document.getElementById('timerValue').textContent = '00:00';
+      updateStats(); resetBalls(); overlay.classList.remove('show');
+    };
+    document.getElementById('duration').onchange = () => { saveSettings(); };
+
+    updateCrosshair();
+    resetBalls();
+    startClock();
+    updateShootBtnPosition();
+
+    window.addEventListener('resize', updateShootBtnPosition);
+
+    let frameCount = 0, lastFpsTime = performance.now();
+    const fpsEl = document.getElementById('fpsValue');
+    function animate() {
+      requestAnimationFrame(animate);
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsTime >= 1000) {
+        fpsEl.textContent = Math.round(frameCount / ((now - lastFpsTime) / 1000));
+        frameCount = 0; lastFpsTime = now;
+      }
+      if (state.active && state.aimLock && state.balls.length > 0) {
+        let target = state.balls[0];
+        let closest = Infinity;
+        for (const b of state.balls) {
+          const p = b.position.clone(); p.project(camera);
+          const d = p.distanceTo(new THREE.Vector3(0,0,0));
+          if (d < closest) { closest = d; target = b; }
+        }
+        if (target) {
+          const pos = target.position.clone();
+          const dir = pos.clone().sub(camera.position).normalize();
+          const targetYaw = Math.atan2(-dir.x, -dir.z);
+          const targetPitch = Math.asin(dir.y);
+          let yawDiff = targetYaw - state.yaw;
+          while (yawDiff > Math.PI) yawDiff -= 2*Math.PI;
+          while (yawDiff < -Math.PI) yawDiff += 2*Math.PI;
+          state.yaw += yawDiff * 0.15;
+          let pitchDiff = targetPitch - state.pitch;
+          pitchDiff = Math.max(-0.1, Math.min(0.1, pitchDiff));
+          state.pitch += pitchDiff * 0.15;
+          state.pitch = Math.max(-1.2, Math.min(1.2, state.pitch));
+          camera.quaternion.setFromEuler(new THREE.Euler(state.pitch, state.yaw, 0, 'YXZ'));
+        }
+      }
+      if (state.active && state.autoShoot && state.balls.length > 0) {
+        const nowT = performance.now();
+        if (nowT - state.lastAutoShootTime > 200) {
+          state.lastAutoShootTime = nowT;
+          performShoot();
+        }
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.onresize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      updateShootBtnPosition();
+    };
+
+    document.oncontextmenu = () => false;
+    document.oncopy = document.oncut = document.onpaste = () => false;
+    document.onkeydown = e => {
+      if (e.key === 'F12' || e.keyCode === 123) { e.preventDefault(); return false; }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.keyCode === 73)) { e.preventDefault(); return false; }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'U' || e.keyCode === 85)) { e.preventDefault(); return false; }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'S' || e.keyCode === 83)) { e.preventDefault(); return false; }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'P' || e.keyCode === 80)) { e.preventDefault(); return false; }
+    };
+    document.ondragstart = () => false;
+  </script>
+</body>
+</html>
